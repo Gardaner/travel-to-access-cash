@@ -155,7 +155,7 @@
 // ─── JSONBIN CONFIG ──────────────────────────────────────────
 const JSONBIN_CONFIG = {
   masterKey: "$2a$10$K1n3Snel5fosK4ZA0m67F.Rh9yqUx4Wj8RIZ2SCh04ehXKtyRuGGW",
-  binId:     "",
+  binId:     "69b1ece0b7ec241ddc5eed15",
   pollMs:    15000
 };
 
@@ -292,27 +292,8 @@ const RANGES = [
 ];
 let allResponses = [];
 let pollTimer    = null;
-let binId        = JSONBIN_CONFIG.binId || "";
+let binId        = JSONBIN_CONFIG.binId || localStorage.getItem('cashSurveyBinId') || "";
 const configured = JSONBIN_CONFIG.masterKey && JSONBIN_CONFIG.masterKey !== "YOUR_MASTER_KEY_HERE";
-
-// Auto-discover the bin from JSONBin using the master key
-// This means ANY device with the master key will find the shared bin
-async function discoverBinId() {
-  try {
-    const res  = await fetch('https://api.jsonbin.io/v3/b', {
-      headers: { 'X-Master-Key': JSONBIN_CONFIG.masterKey }
-    });
-    if (!res.ok) return;
-    const json = await res.json();
-    // Find our named bin
-    const bins = Array.isArray(json) ? json : (json.bins || json.records || []);
-    const match = bins.find(b => (b.snippetMeta && b.snippetMeta.name === 'cash-distance-survey')
-                               || b.name === 'cash-distance-survey');
-    if (match) {
-      binId = match._id || match.id || match.snippetMeta && match.snippetMeta.id;
-    }
-  } catch(e) { console.warn('discoverBinId:', e); }
-}
 
 (async function init() {
   if (!configured) {
@@ -321,8 +302,6 @@ async function discoverBinId() {
     renderResults();
     return;
   }
-  // Try to find existing bin
-  if (!binId) await discoverBinId();
   await fetchResults();
   pollTimer = setInterval(fetchResults, JSONBIN_CONFIG.pollMs);
   document.getElementById('pollNote').textContent = 'Auto-refreshes every ' + (JSONBIN_CONFIG.pollMs/1000) + 's';
@@ -366,6 +345,7 @@ async function submitResponse() {
       const updated = [{name,km,timestamp:Date.now()}, ...allResponses];
       if (!binId) {
         binId = await createBin(updated);
+        localStorage.setItem('cashSurveyBinId', binId);
         if (!pollTimer) {
           pollTimer = setInterval(fetchResults, JSONBIN_CONFIG.pollMs);
           document.getElementById('pollNote').textContent = 'Auto-refreshes every ' + (JSONBIN_CONFIG.pollMs/1000) + 's';
